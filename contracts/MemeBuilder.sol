@@ -3,6 +3,30 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./MemeToken.sol";
+
+interface INonfungiblePositionManager {
+    function mint(
+        address token0,
+        address token1,
+        uint24 fee,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0Desired,
+        uint256 amount1Desired,
+        uint256 amount0Min,
+        uint256 amount1Min,
+        address recipient,
+        uint256 deadline
+    )
+        external
+        returns (
+            uint256 tokenId,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        );
+}
 
 contract MemeBuilder is AccessControl {
     address public platformFeeAddress;
@@ -10,7 +34,12 @@ contract MemeBuilder is AccessControl {
     address public investorAddress;
     address public ownerAddress;
     address public communityTreasuryAddress;
+    address public lpVaultAddress;
 
+    INonfungiblePositionManager public positionManager;
+
+    address public positionManagerAddress =
+        0x427bF5b37357632377eCbEC9de3626C71A5396c1;
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
@@ -20,6 +49,9 @@ contract MemeBuilder is AccessControl {
         investorAddress = msg.sender;
         ownerAddress = msg.sender;
         communityTreasuryAddress = msg.sender;
+        lpVaultAddress = msg.sender;
+
+        positionManager = INonfungiblePositionManager(positionManagerAddress);
     }
 
     // bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -39,6 +71,7 @@ contract MemeBuilder is AccessControl {
         uint256 id;
         address owner;
         string name;
+        string symbol;
         uint256 supply;
         string memeStory;
         string logo;
@@ -94,6 +127,7 @@ contract MemeBuilder is AccessControl {
     // Function to create a new meme proposal
     function createMemeProposal(
         string memory _name,
+        string memory _symbol,
         uint256 _supply,
         string memory _memeStory,
         string memory _logo,
@@ -106,6 +140,7 @@ contract MemeBuilder is AccessControl {
                 proposals.length, // Assuming id is the index in the array
                 msg.sender,
                 _name,
+                _symbol,
                 _supply,
                 _memeStory,
                 _logo,
@@ -124,9 +159,61 @@ contract MemeBuilder is AccessControl {
         emit NewMemeProposal(msg.sender, proposals.length - 1);
     }
 
+    event TokenCreated(
+        address indexed tokenAddress,
+        address indexed owner,
+        uint256 initialSupply
+    );
+
+    struct MintParams {
+        address token0;
+        address token1;
+        uint24 fee;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        address recipient;
+        uint256 deadline;
+    }
+    function provideFullRangeLiquidity(MintParams memory params) internal {
+        IERC20(params.token0).approve(
+            address(positionManager),
+            params.amount0Desired
+        );
+        IERC20(params.token1).approve(
+            address(positionManager),
+            params.amount1Desired
+        );
+
+        // Define the full range by setting ticks from lowest possible (-887220) to highest possible (887220)
+        int24 tickLower = -887220;
+        int24 tickUpper = 887220;
+        // Call mint to create a full-range liquidity position
+        (
+            uint256 tokenId,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        ) = positionManager.mint(
+                params.token0,
+                params.token1,
+                params.fee,
+                tickLower,
+                tickUpper,
+                params.amount0Desired,
+                params.amount1Desired,
+                params.amount0Min,
+                params.amount1Min,
+                params.recipient,
+                params.deadline
+            );
+
+        // Optionally, handle tokenId or other returned values here for tracking purposes
+    }
+
     function mintMeme(uint[] memory ids) public {
         for (uint i = 0; i < ids.length; i++) {
-            
             require(
                 keccak256(bytes(memeProposals_[ids[i]].status)) !=
                     keccak256(bytes("MINTED")),
@@ -150,13 +237,45 @@ contract MemeBuilder is AccessControl {
                 10000;
 
             //TODO: creatr token
+            MemeToken newToken = new MemeToken(
+                address(this),
+                totalSupply,
+                memeProposals_[ids[i]].name,
+                memeProposals_[ids[i]].symbol
+            );
+
             memeProposals_[ids[i]].status = "MINTED";
 
-            //TODO: provide liquidity on pancakes swap
-
-            //TODO: move LP token to
+            //TODO: provide liquidity on pancakes swap v3
+            provideFullRangeLiquidity(
+                MintParams(
+                    address(newToken),
+                    memeProposals_[ids[i]].memeRequirement.token,
+                    500,
+                    liquidity,
+                    memeProposals_[ids[i]].risedAmount,
+                    1,
+                    1,
+                    lpVaultAddress,
+                    block.timestamp + 1 minutes
+                )
+            );
 
             //TODO: distribute token
+            IERC20(address(newToken)).transfer(platformFeeAddress, platformFee);
+            IERC20(address(newToken)).transfer(
+                communityTreasuryAddress,
+                communityTreasury
+            );
+
+            IERC20(address(newToken)).transfer(
+                communityDropAddress,
+                communityDrop
+            );
+
+            //Move to vesting
+            // IERC20(address(newToken)).transfer(investorAddress, investor);
+            // IERC20(address(newToken)).transfer(ownerAddress, owner);
         }
     }
 
