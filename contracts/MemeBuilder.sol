@@ -5,20 +5,26 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./MemeToken.sol";
 
+interface IPancakeV3Factory {
+    function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool);
+}
+
 interface INonfungiblePositionManager {
-    function mint(
-        address token0,
-        address token1,
-        uint24 fee,
-        int24 tickLower,
-        int24 tickUpper,
-        uint256 amount0Desired,
-        uint256 amount1Desired,
-        uint256 amount0Min,
-        uint256 amount1Min,
-        address recipient,
-        uint256 deadline
-    )
+    struct MintParams {
+        address token0;
+        address token1;
+        uint24 fee;
+        int24 tickLower;
+        int24 tickUpper;
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        uint256 amount0Min;
+        uint256 amount1Min;
+        address recipient;
+        uint256 deadline;
+    }
+
+    function mint(MintParams calldata params)
         external
         returns (
             uint256 tokenId,
@@ -36,10 +42,11 @@ contract MemeBuilder is AccessControl {
     address public communityTreasuryAddress;
     address public lpVaultAddress;
 
-    INonfungiblePositionManager public positionManager;
+ 
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     address public positionManagerAddress =
         0x427bF5b37357632377eCbEC9de3626C71A5396c1;
+    address public factoryAddress = 0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865;
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(EXECUTOR_ROLE, msg.sender);
@@ -52,7 +59,7 @@ contract MemeBuilder is AccessControl {
         communityTreasuryAddress = msg.sender;
         lpVaultAddress = msg.sender;
 
-        positionManager = INonfungiblePositionManager(positionManagerAddress);
+ 
     }
 
     struct MemeRequirement {
@@ -105,8 +112,8 @@ contract MemeBuilder is AccessControl {
     // uint votePeriod = 1 weeks;
     // uint investPeriod = 2 weeks;
 
-    uint votePeriod   = 5 minutes;
-    uint investPeriod = 5 minutes;
+    uint votePeriod = 2 minutes;
+    uint investPeriod = 2 minutes;
 
     uint minimumVoter = 1;
 
@@ -175,42 +182,32 @@ contract MemeBuilder is AccessControl {
         address recipient;
         uint256 deadline;
     }
-    function provideFullRangeLiquidity(MintParams memory params) internal {
-        IERC20(params.token0).approve(
-            address(positionManager),
-            params.amount0Desired
-        );
-        IERC20(params.token1).approve(
-            address(positionManager),
-            params.amount1Desired
-        );
+    // function provideFullRangeLiquidity(MintParams memory params) internal {
+    //     // Define the full range by setting ticks from lowest possible (-887220) to highest possible (887220)
+    //     int24 tickLower = -887220;
+    //     int24 tickUpper = 887220;
+    //     // Call mint to create a full-range liquidity position
+    //     (
+    //         uint256 tokenId,
+    //         uint128 liquidity,
+    //         uint256 amount0,
+    //         uint256 amount1
+    //     ) = positionManager.mint(
+    //             params.token0,
+    //             params.token1,
+    //             params.fee,
+    //             tickLower,
+    //             tickUpper,
+    //             params.amount0Desired,
+    //             params.amount1Desired,
+    //             params.amount0Min,
+    //             params.amount1Min,
+    //             params.recipient,
+    //             params.deadline
+    //         );
 
-        // Define the full range by setting ticks from lowest possible (-887220) to highest possible (887220)
-        int24 tickLower = -887220;
-        int24 tickUpper = 887220;
-        // Call mint to create a full-range liquidity position
-        (
-            uint256 tokenId,
-            uint128 liquidity,
-            uint256 amount0,
-            uint256 amount1
-        ) = positionManager.mint(
-                params.token0,
-                params.token1,
-                params.fee,
-                tickLower,
-                tickUpper,
-                params.amount0Desired,
-                params.amount1Desired,
-                params.amount0Min,
-                params.amount1Min,
-                params.recipient,
-                params.deadline
-            );
-
-        // Optionally, handle tokenId or other returned values here for tracking purposes
-    }
-
+    //     // Optionally, handle tokenId or other returned values here for tracking purposes
+    // }
 
     event SetFailed(uint256 indexed id);
     function cleanMeme(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
@@ -230,6 +227,45 @@ contract MemeBuilder is AccessControl {
             }
         }
     }
+
+    event LiquidityProvided(uint256 indexed tokenId, uint128 liquidity, uint256 amount0, uint256 amount1);
+
+    function provideLP(
+        address tokenA,
+        address tokenB,
+        uint24 fee,
+        uint amountADesired,
+        uint amountBDesired
+    ) external {
+
+
+        IPancakeV3Factory(factoryAddress).createPool(tokenA, tokenB, fee);
+
+        require(IERC20(tokenA).transferFrom(msg.sender, address(this), amountADesired), "Transfer of tokenA failed");
+        require(IERC20(tokenB).transferFrom(msg.sender, address(this), amountBDesired), "Transfer of tokenB failed");
+
+        IERC20(tokenA).approve(positionManagerAddress, amountADesired);
+        IERC20(tokenB).approve(positionManagerAddress, amountBDesired);
+        int24 tickLower = -887220;
+        int24 tickUpper = 887220;
+        INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
+            token0: tokenA,
+            token1: tokenB,
+            fee: fee,
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            amount0Desired: amountADesired,
+            amount1Desired: amountBDesired,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: msg.sender,
+            deadline: block.timestamp + 1 hours
+        });
+
+        (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) = INonfungiblePositionManager(positionManagerAddress).mint(params);
+        emit LiquidityProvided(tokenId, liquidity, amount0, amount1);
+    }
+
     function mintMeme(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
         for (uint i = 0; i < ids.length; i++) {
             require(
@@ -265,31 +301,31 @@ contract MemeBuilder is AccessControl {
             memeProposals_[ids[i]].status = "MINTED";
 
             //TODO: provide liquidity on pancakes swap v3
-            provideFullRangeLiquidity(
-                MintParams(
-                    address(newToken),
-                    memeProposals_[ids[i]].memeRequirement.token,
-                    500,
-                    liquidity,
-                    memeProposals_[ids[i]].risedAmount,
-                    1,
-                    1,
-                    lpVaultAddress,
-                    block.timestamp + 1 minutes
-                )
-            );
+            // provideFullRangeLiquidity(
+            //     MintParams(
+            //         address(newToken),
+            //         memeProposals_[ids[i]].memeRequirement.token,
+            //         500,
+            //         liquidity,
+            //         memeProposals_[ids[i]].risedAmount,
+            //         1,
+            //         1,
+            //         lpVaultAddress,
+            //         block.timestamp + 1 minutes
+            //     )
+            // );
 
             //TODO: distribute token
-            IERC20(address(newToken)).transfer(platformFeeAddress, platformFee);
-            IERC20(address(newToken)).transfer(
-                communityTreasuryAddress,
-                communityTreasury
-            );
+            // IERC20(address(newToken)).transfer(platformFeeAddress, platformFee);
+            // IERC20(address(newToken)).transfer(
+            //     communityTreasuryAddress,
+            //     communityTreasury
+            // );
 
-            IERC20(address(newToken)).transfer(
-                communityDropAddress,
-                communityDrop
-            );
+            // IERC20(address(newToken)).transfer(
+            //     communityDropAddress,
+            //     communityDrop
+            // );
 
             //Move to vesting
             // IERC20(address(newToken)).transfer(investorAddress, investor);

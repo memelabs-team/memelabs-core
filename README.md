@@ -19,13 +19,15 @@ npx hardhat ignition deploy ./ignition/modules/MemeBuilder.ts --network bsc_test
 npx hardhat ignition deploy ./ignition/modules/MemeUSDT.ts --network bsc_testnet 
 npx hardhat ignition deploy ./ignition/modules/MemeFactory.ts --network bsc_testnet
 npx hardhat ignition deploy ./ignition/modules/LPVault.ts --network bsc_testnet
+npx hardhat ignition deploy ./ignition/modules/MemeTestToken.ts --network bsc_testnet
+
 
 npx hardhat verify --network bsc_testnet 0x4337f1174e0f7A09a356BfA3fC75582cFBD35259
 npx hardhat verify --network bsc_testnet 0x801380dA6041F034E929b8BC91d904A2e04E7405
-npx hardhat verify --network bsc_testnet 0xe2c1A995B3A3E0Cd6CadDCeF4929EeD2303aF011
+npx hardhat verify --network bsc_testnet 0x2ee2Ef059AE644d8E982428317EA0DD756E2eCfe
 ```
 
-
+### Testnet
 | Smart Contract | Address                                    | Status   |
 |----------------------------|--------------------------------------------|----------|
 | MemeBuilder                | 0xc310c49418cb9c78E275253fC890cFBd3772986A | Deployed |
