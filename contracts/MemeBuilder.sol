@@ -1,10 +1,25 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.27;
+
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 contract MemeBuilder is AccessControl {
+    address public platformFeeAddress;
+    address public communityDropAddress;
+    address public investorAddress;
+    address public ownerAddress;
+    address public communityTreasuryAddress;
+
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+
+        //TEST
+        platformFeeAddress = msg.sender;
+        communityDropAddress = msg.sender;
+        investorAddress = msg.sender;
+        ownerAddress = msg.sender;
+        communityTreasuryAddress = msg.sender;
     }
 
     // bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -36,7 +51,6 @@ contract MemeBuilder is AccessControl {
         uint voteYes;
         uint voteNo;
         uint256 risedAmount;
-       
     }
 
     mapping(uint => mapping(address => bool)) memeVoters;
@@ -56,8 +70,12 @@ contract MemeBuilder is AccessControl {
         NO
     }
 
-    uint votePeriod = 1 weeks;
-    uint investPeriod = 2 weeks;
+    // uint votePeriod = 1 weeks;
+    // uint investPeriod = 2 weeks;
+
+    uint votePeriod = 5 minutes;
+    uint investPeriod = 10 minutes;
+
     uint minimumVoter = 5;
 
     function setMinimumVoter(uint voter) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -106,11 +124,46 @@ contract MemeBuilder is AccessControl {
         emit NewMemeProposal(msg.sender, proposals.length - 1);
     }
 
+    function mintMeme(uint[] memory ids) public {
+        for (uint i = 0; i < ids.length; i++) {
+            
+            require(
+                keccak256(bytes(memeProposals_[ids[i]].status)) !=
+                    keccak256(bytes("MINTED")),
+                "Meme already minted"
+            );
+
+            uint totalSupply = memeProposals_[ids[i]].supply;
+            uint256 platformFee = (totalSupply *
+                memeProposals_[ids[i]].memeRequirement.platformFeeRate) / 10000;
+            uint256 communityDrop = (totalSupply *
+                memeProposals_[ids[i]].memeRequirement.communityDropRate) /
+                10000;
+            uint256 liquidity = (totalSupply *
+                memeProposals_[ids[i]].memeRequirement.liquidityRate) / 10000;
+            uint256 investor = (totalSupply *
+                memeProposals_[ids[i]].memeRequirement.investorRate) / 10000;
+            uint256 owner = (totalSupply *
+                memeProposals_[ids[i]].memeRequirement.ownerRate) / 10000;
+            uint256 communityTreasury = (totalSupply *
+                memeProposals_[ids[i]].memeRequirement.communityTreasuryRate) /
+                10000;
+
+            //TODO: creatr token
+            memeProposals_[ids[i]].status = "MINTED";
+
+            //TODO: provide liquidity on pancakes swap
+
+            //TODO: move LP token to
+
+            //TODO: distribute token
+        }
+    }
+
     // Function to retrieve meme proposals with a specific status
     function getMemeProposalsByStatus(
         string memory status
     ) external view returns (MemeProposal[] memory) {
- 
         uint256 count = 0;
         for (uint256 i = 0; i < memeProposals_.length; i++) {
             if (
@@ -158,7 +211,7 @@ contract MemeBuilder is AccessControl {
         );
 
         //TODO: validate invest amount
-        
+
         memeProposals_[id].risedAmount += amount;
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
