@@ -5,6 +5,7 @@ pragma solidity ^0.8.27;
 // import "hardhat/console.sol";
 
 contract MemeBuilder {
+
     struct MemeRequirement {
         address token;
         uint256 amount;
@@ -41,14 +42,8 @@ contract MemeBuilder {
         uint256 _supply,
         string memory _memeStory,
         string memory _logo,
-        address _token,
-        uint256 _minAmount,
-        uint256 _platformFeeRate,
-        uint256 _communityDropRate,
-        uint256 _liquidityRate,
-        uint256 _investorRate,
-        uint256 _ownerRate,
-        uint256 _communityTreasuryRate
+        SocialChannel memory _socialChannel,
+        MemeRequirement memory _memeRequirement
     ) external {
         // Uncomment this line to use console.log
         // console.log("Creating Meme Proposal: Name = %s, Supply = %s", _name, _supply);
@@ -62,17 +57,8 @@ contract MemeBuilder {
                 _memeStory,
                 _logo,
                 "VOTING",
-                SocialChannel("", ""),
-                MemeRequirement(
-                    _token,
-                    _minAmount,
-                    _platformFeeRate,
-                    _communityDropRate,
-                    _liquidityRate,
-                    _investorRate,
-                    _ownerRate,
-                    _communityTreasuryRate
-                )
+                _socialChannel,
+                _memeRequirement
             )
         );
     
