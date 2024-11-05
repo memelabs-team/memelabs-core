@@ -30,6 +30,6 @@ npx hardhat verify --network bsc_testnet 0x2ee2Ef059AE644d8E982428317EA0DD756E2e
 ### Testnet
 | Smart Contract | Address                                    | Status   |
 |----------------------------|--------------------------------------------|----------|
-| MemeBuilder                | 0xc310c49418cb9c78E275253fC890cFBd3772986A | Deployed |
+| MemeBuilder                | 0xf47f56A933eD6F9A7A195121d2c0aFCA845B1629 | Deployed |
 | Memelabs USDT(mUSDT)       | 0xb26463e35841898aCae40c1724D732f268F56349 | Deployed |
 | LPVault                    | 0x5fE287Cb757cFD7150A5B3A9f4c2a3bf95E613a9 | Deployed |
