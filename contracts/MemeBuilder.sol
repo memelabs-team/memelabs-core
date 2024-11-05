@@ -29,7 +29,6 @@ interface INonfungiblePositionManager {
 }
 
 contract MemeBuilder is AccessControl {
-
     address public platformFeeAddress;
     address public communityDropAddress;
     address public investorAddress;
@@ -55,7 +54,6 @@ contract MemeBuilder is AccessControl {
 
         positionManager = INonfungiblePositionManager(positionManagerAddress);
     }
-
 
     struct MemeRequirement {
         address token;
@@ -107,10 +105,10 @@ contract MemeBuilder is AccessControl {
     // uint votePeriod = 1 weeks;
     // uint investPeriod = 2 weeks;
 
-    uint votePeriod = 5 minutes;
-    uint investPeriod = 10 minutes;
+    uint votePeriod   = 5 minutes;
+    uint investPeriod = 5 minutes;
 
-    uint minimumVoter = 5;
+    uint minimumVoter = 1;
 
     function setMinimumVoter(uint voter) external onlyRole(DEFAULT_ADMIN_ROLE) {
         minimumVoter = voter;
@@ -213,6 +211,25 @@ contract MemeBuilder is AccessControl {
         // Optionally, handle tokenId or other returned values here for tracking purposes
     }
 
+
+    event SetFailed(uint256 indexed id);
+    function cleanMeme(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
+        for (uint i = 0; i < ids.length; i++) {
+            if (
+                keccak256(bytes(memeProposals_[ids[i]].status)) ==
+                keccak256(bytes("IN-PROCESS"))
+            ) {
+                if (
+                    block.timestamp > memeProposals_[ids[i]].startInvestmentAt
+                ) {
+                    if (!voteResult(ids[i])) {
+                        memeProposals_[ids[i]].status = "FAILED";
+                        emit SetFailed(ids[i]);
+                    }
+                }
+            }
+        }
+    }
     function mintMeme(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
         for (uint i = 0; i < ids.length; i++) {
             require(
@@ -341,12 +358,6 @@ contract MemeBuilder is AccessControl {
             block.timestamp >= memeProposals_[id].startVotingAt &&
                 block.timestamp < memeProposals_[id].startInvestmentAt,
             "Voting period has ended"
-        );
-
-        require(
-            keccak256(bytes(memeProposals_[id].status)) ==
-                keccak256(bytes("VOTING")),
-            "Proposal is not voting"
         );
 
         require(!memeVoters[id][msg.sender], "Voting already done");
