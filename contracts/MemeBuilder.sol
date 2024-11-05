@@ -29,6 +29,7 @@ interface INonfungiblePositionManager {
 }
 
 contract MemeBuilder is AccessControl {
+
     address public platformFeeAddress;
     address public communityDropAddress;
     address public investorAddress;
@@ -37,11 +38,12 @@ contract MemeBuilder is AccessControl {
     address public lpVaultAddress;
 
     INonfungiblePositionManager public positionManager;
-
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     address public positionManagerAddress =
         0x427bF5b37357632377eCbEC9de3626C71A5396c1;
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(EXECUTOR_ROLE, msg.sender);
 
         //TEST
         platformFeeAddress = msg.sender;
@@ -54,7 +56,6 @@ contract MemeBuilder is AccessControl {
         positionManager = INonfungiblePositionManager(positionManagerAddress);
     }
 
-    // bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     struct MemeRequirement {
         address token;
@@ -212,7 +213,7 @@ contract MemeBuilder is AccessControl {
         // Optionally, handle tokenId or other returned values here for tracking purposes
     }
 
-    function mintMeme(uint[] memory ids) public {
+    function mintMeme(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
         for (uint i = 0; i < ids.length; i++) {
             require(
                 keccak256(bytes(memeProposals_[ids[i]].status)) !=

@@ -5,7 +5,7 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 const MemeUSDTModule = buildModule("MemeUSDTModule", (m) => {
 
-  const MemeUSDT = m.contract("MEMEUSDT");
+  const MemeUSDT = m.contract("MemeUSDT");
 
   return { MemeUSDT };
 });
