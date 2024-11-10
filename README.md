@@ -15,16 +15,19 @@ npx hardhat ignition deploy ./ignition/modules/Lock.ts
 
 ### Deployments
 ```
-npx hardhat ignition deploy ./ignition/modules/MemeBuilder.ts --network bsc_testnet 
-npx hardhat ignition deploy ./ignition/modules/MemeUSDT.ts --network bsc_testnet 
+npx hardhat ignition deploy ./ignition/modules/MemeBuilder.ts --network bsc_testnet
+npx hardhat ignition deploy ./ignition/modules/MemeUSDT.ts --network bsc_testnet
 npx hardhat ignition deploy ./ignition/modules/MemeFactory.ts --network bsc_testnet
 npx hardhat ignition deploy ./ignition/modules/LPVault.ts --network bsc_testnet
 npx hardhat ignition deploy ./ignition/modules/MemeTestToken.ts --network bsc_testnet
+npx hardhat ignition deploy ./ignition/modules/Vesting.ts --network bsc_testnet
+npx hardhat ignition deploy ./ignition/modules/TestLP.ts --network bsc_testnet
 
-
-npx hardhat verify --network bsc_testnet 0x4337f1174e0f7A09a356BfA3fC75582cFBD35259
+npx hardhat verify --network bsc_testnet 0x0B76F788c3fcf0352b07275B20B39932912765A4
 npx hardhat verify --network bsc_testnet 0x801380dA6041F034E929b8BC91d904A2e04E7405
-npx hardhat verify --network bsc_testnet 0x2ee2Ef059AE644d8E982428317EA0DD756E2eCfe
+npx hardhat verify --network bsc_testnet 0x00d9c12CE07316F59EE7986d2D08a63D1f3F95c1
+
+
 ```
 
 ### Testnet
