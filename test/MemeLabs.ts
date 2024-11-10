@@ -168,8 +168,13 @@ describe("MemeLab", function () {
       console.log(await memeBuilder.isVoteResultPassed(0))
       // console.log( await memeBuilder.getMemeProposalsByStatus("IN-PROCESS"))
 
+
+      console.log("getWaitingMintProposals (1):",await memeBuilder.getWaitingMintProposals(0,10))
+
       console.log("createdProposal:", createdProposal.id)
       await memeBuilder.connect(owner).mint([createdProposal.id])
+
+      console.log("getWaitingMintProposals (2):",await memeBuilder.getWaitingMintProposals(0,10))
 
       console.log(await memeUSDT.balanceOf(memeBuilderAddress))
 

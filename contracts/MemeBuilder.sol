@@ -160,6 +160,11 @@ contract MemeBuilder is AccessControl, ERC721Holder {
     uint public investPeriod = 5 minutes;
     uint public minimumVoter = 1;
     uint public voterRate = 100;// 1%
+    uint public investmentRate = 100;// 1%
+
+    function setInvestmentRate(uint value) external onlyRole(DEFAULT_ADMIN_ROLE)  {
+        investmentRate = value;
+    }
 
     function setVoterRate(uint _voteRate) external onlyRole(DEFAULT_ADMIN_ROLE)  {
         voterRate = _voteRate;
@@ -285,7 +290,10 @@ contract MemeBuilder is AccessControl, ERC721Holder {
             }
         }
     }
-
+    
+    function isReadyToMint(uint id) public view returns (bool) {
+        return memeProposals[id].risedAmount >= memeProposals[id].memeRequirement.amount;
+    }
 
     function mint(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
 
@@ -324,8 +332,14 @@ contract MemeBuilder is AccessControl, ERC721Holder {
             memeProposals[ids[i]].status = "MINTED";
 
             //Provide liquidity on pancakes swap v3
-            createPool(address(newToken),memeProposals[ids[i]].memeRequirement.token,liquidity,totalRaisedAmount);
-            provideLP(address(newToken),memeProposals[ids[i]].memeRequirement.token,liquidity,totalRaisedAmount);
+            address token0 = address(newToken);
+            address token1 = memeProposals[ids[i]].memeRequirement.token;
+
+            IERC20(token0).approve(positionManagerAddress, liquidity);
+            IERC20(token1).approve(positionManagerAddress, totalRaisedAmount);
+            
+            createPool(token0,token1,liquidity,totalRaisedAmount);
+            provideLP(token0,token1,liquidity,totalRaisedAmount);
 
             //Deposit tokens to community treasury
             IERC20(address(newToken)).approve(communityTreasuryAddress, communityTreasury);
@@ -612,6 +626,46 @@ contract MemeBuilder is AccessControl, ERC721Holder {
         return proposals;
     }
 
+    function getWaitingMintProposals(  
+        uint256 _page,
+        uint256 _pageSize)
+        external
+        view
+        returns (MemeProposal[] memory)
+    {
+    
+        uint256 count = memeProposals.length;
+        MemeProposal[] memory proposals = new MemeProposal[](_pageSize);
+        uint256 index = 0;
+
+        // calculate the start index based on the page number
+        uint256 startIndex = _page * _pageSize;
+
+        for (uint256 i = startIndex; i < memeProposals.length; i++) {
+            if (
+                keccak256(bytes(memeProposals[i].status)) == keccak256(bytes("IN-PROCESS")) &&
+                isVoteResultPassed(memeProposals[i].id) && 
+                isReadyToMint(memeProposals[i].id)
+            ) {
+                if (index >= _pageSize) {
+                    break;
+                }
+                MemeProposal memory proposal = memeProposals[i];
+                proposal.minimumVoter = calculateVoterAmount(memeProposals[i].id);
+                (proposal.minimumInvestmentAmount, proposal.maximumInvestmentAmount) = calculateInvestmentAmountPerAddress(proposal.memeRequirement.amount);
+                proposals[index] = proposal;
+                index++;
+            }
+        }
+
+        // truncate the array to the correct length
+        assembly {
+            mstore(proposals, index)
+        }
+
+        return proposals;
+    }
+
     function getMentedMemes( 
         uint256 _page,
         uint256 _pageSize
@@ -673,7 +727,8 @@ contract MemeBuilder is AccessControl, ERC721Holder {
      */
     function calculateInvestmentAmountPerAddress(uint requiredAmount) internal view returns (uint, uint) {
         // Calculate the minimum investment amount by scaling the required amount
-        uint256 minimumInvestmentAmount = (requiredAmount * voterRate) / 10000 / 1e18;
+
+        uint256 minimumInvestmentAmount = (requiredAmount * investmentRate) / 10000;
 
         // Calculate the maximum investment amount as double the minimum investment amount
         uint maximumInvestmentAmount = minimumInvestmentAmount * 2;
@@ -751,7 +806,7 @@ contract MemeBuilder is AccessControl, ERC721Holder {
         );
 
         // Calculate the price ratio based on amountADesired and amountBDesired
-        uint256 priceRatio = (amountBDesired * (10 ** 18)) / amountADesired;
+        // uint256 priceRatio = (amountBDesired * (10 ** 18)) / amountADesired;
 
         // Calculate sqrtPriceX96 using the price ratio
         uint160 sqrtPriceX96 = calculateSqrtPriceX96(
@@ -767,12 +822,9 @@ contract MemeBuilder is AccessControl, ERC721Holder {
     }  
 
     function provideLP(address tokenA, address tokenB, uint256 amountADesired,uint256 amountBDesired) internal returns (uint256){
-       
+    
 
-        IERC20(tokenA).approve(positionManagerAddress, amountADesired);
-        IERC20(tokenB).approve(positionManagerAddress, amountBDesired);
-
-        INonfungiblePositionManager.MintParams
+       INonfungiblePositionManager.MintParams
             memory params = INonfungiblePositionManager.MintParams({
                 token0: tokenA,
                 token1: tokenB,

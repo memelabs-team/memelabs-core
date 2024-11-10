@@ -10,7 +10,7 @@ contract MemeToken is ERC20, Ownable {
         Ownable(initialOwner)
  {
         _transferOwnership(initialOwner);
-        _mint(initialOwner, initialSupply * 10 ** 18);
+        _mint(initialOwner, initialSupply);
 
  }
 }
