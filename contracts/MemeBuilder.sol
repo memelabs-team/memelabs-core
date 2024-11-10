@@ -91,10 +91,6 @@ contract MemeBuilder is AccessControl, ERC721Holder {
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(EXECUTOR_ROLE, msg.sender);
-
-        vestingAddress = msg.sender;
-
-        lpVaultAddress = msg.sender;
     }
 
     struct SocialChannel {
@@ -294,6 +290,9 @@ contract MemeBuilder is AccessControl, ERC721Holder {
     function mint(uint[] memory ids) public onlyRole(EXECUTOR_ROLE) {
 
         for (uint i = 0; i < ids.length; i++) {
+
+            require(memeProposals[ids[i]].risedAmount >= memeProposals[ids[i]].memeRequirement.amount , "Not enough raised amount");
+            
             require(
                 keccak256(bytes(memeProposals[ids[i]].status)) !=
                     keccak256(bytes("MINTED")),
@@ -307,7 +306,7 @@ contract MemeBuilder is AccessControl, ERC721Holder {
                 memeProposals[ids[i]].memeRequirement.liquidityRate) / 10000;
             uint256 amountForInvestor = (totalSupply *
                 memeProposals[ids[i]].memeRequirement.investorRate) / 10000;
-            uint256 owner = (totalSupply *
+            uint256 ownerAmount = (totalSupply *
                 memeProposals[ids[i]].memeRequirement.ownerRate) / 10000;
             uint256 communityTreasury = (totalSupply *
                 memeProposals[ids[i]].memeRequirement.communityTreasuryRate) /
@@ -356,6 +355,17 @@ contract MemeBuilder is AccessControl, ERC721Holder {
                 );
             }
 
+            //for owner
+            MemeVesting(vestingAddress).addVesting(
+                    memeProposals[ids[i]].owner,
+                    address(newToken),
+                    ownerAmount,
+                    block.timestamp,
+                    releaseTokenTime,
+                    ids[i]
+            );
+
+
             IERC20(address(newToken)).transfer(
                 vestingAddress,
                 amountForInvestor
@@ -364,7 +374,6 @@ contract MemeBuilder is AccessControl, ERC721Holder {
           
         }
     }
-
 
     function hasAlreadyVoted(
         uint id,
@@ -581,7 +590,6 @@ contract MemeBuilder is AccessControl, ERC721Holder {
         for (uint256 i = startIndex; i < memeProposals.length; i++) {
             if (
                 keccak256(bytes(memeProposals[i].status)) == keccak256(bytes("IN-PROCESS")) &&
-                block.timestamp >= memeProposals[i].startInvestmentAt &&
                 block.timestamp < memeProposals[i].startVestingAt &&
                 isVoteResultPassed(memeProposals[i].id)
             ) {
@@ -689,8 +697,7 @@ contract MemeBuilder is AccessControl, ERC721Holder {
    
     function invest(uint256 id, address token, uint amount) external {
         require(
-            block.timestamp >= memeProposals[id].startInvestmentAt &&
-                block.timestamp < memeProposals[id].startVestingAt,
+            isVoteResultPassed(id) && block.timestamp < memeProposals[id].startVestingAt,
             "Investment period has ended"
         );
 
